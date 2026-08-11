@@ -1,7 +1,16 @@
-from fastapi import FastAPI, HTTPException
-from app.postschema import PostModel
+from fastapi import FastAPI, HTTPException, Form, File, UploadFile, Depends
+from app.models import PostModel
+from app.core.db import creat_db_and_table, get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await creat_db_and_table()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 text_posts = {
     "1": {
@@ -96,3 +105,12 @@ def add_new_post(post: PostModel) -> PostModel:
         "discription": post.discription
     }
     return text_posts
+
+
+@app.post("/upload")
+async def uploadfile(
+        file: UploadFile = File(...),
+        caption: str = Form(""),
+        session: AsyncSession = Depends(get_async_session)
+):
+    pass
