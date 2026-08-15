@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Form, File, UploadFile, Depends
-from app.models import PostModel, PostImages
+from app.models import PostModel, PostImages, Posts
 from app.core.db import creat_db_and_table, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
@@ -77,35 +77,52 @@ def home():
     return {"isworking": "True"}
 
 
-@app.get("/posts")
-def get_all_posts():
-    return text_posts
+@app.get("/posts/get/all")
+async def get_all_posts(db: AsyncSession = Depends(get_async_session)):
+    result = await db.execute(select(Posts))
+    posts = [row[0] for row in result.all()]
+    post_data = []
+    for post in posts:
+        post_data.append({
+            "auther": post.auther,
+            "title": post.title,
+            "discription": post.discription
+        })
+    return {"posts": post_data}
 
 
-@app.get("/posts/get/{id}")
-def get_post_by_id(id: str) -> PostModel:
-    if id not in text_posts:
-        raise HTTPException(404, detail="post not found")
-    return text_posts.get(id)
+# @app.get("/posts/get/{id}")
+# def get_post_by_id(id: str) -> PostModel:
+#     if id not in text_posts:
+#         raise HTTPException(404, detail="post not found")
+#     return text_posts.get(id)
 
 
-@app.get("/posts/get")
-def get_post_by_limit(lenght: int = None):
-    if lenght:
-        return list(text_posts.values())[:lenght]
-    else:
-        return text_posts
+# @app.get("/posts/get")
+# def get_post_by_limit(lenght: int = None):
+#     if lenght:
+#         return list(text_posts.values())[:lenght]
+#     else:
+#         return text_posts
 
 
 @app.post("/posts/new")
-def add_new_post(post: PostModel) -> PostModel:
-    index = len(text_posts.keys())+1
-    text_posts[index] = {
-        "auther": post.auther,
-        "title": post.title,
-        "discription": post.discription
-    }
-    return text_posts
+async def add_new_post(
+    user_auther: str,
+    user_title: str,
+    dis: str,
+    db: AsyncSession = Depends(get_async_session)
+):
+    post = Posts(
+        auther=user_auther,
+        title=user_title,
+        discription=dis,
+    )
+
+    db.add(post)
+    await db.commit()
+    await db.refresh(post)
+    return post
 
 
 @app.post("/posts/upload")
