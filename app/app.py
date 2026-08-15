@@ -5,7 +5,7 @@ import tempfile
 
 
 from fastapi import FastAPI, HTTPException, Form, File, UploadFile, Depends
-from app.models import PostModel, PostImages, Posts
+from app.models import PostImages, Posts
 from app.core.db import creat_db_and_table, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
@@ -127,11 +127,10 @@ async def get_all_images(
     return {"posts": post_data}
 
 
-@app.delete("/posts/delete/{id}")
-async def delete_item_id(id: str, db: AsyncSession = Depends(get_async_session)):
+@app.delete("/posts/delete/images/{id}")
+async def delete_imagepost_id(id: str, db: AsyncSession = Depends(get_async_session)):
     try:
-        post_id = uuid.UUID(id)
-        response = await db.execute(select(PostImages).where(post_id == PostImages.id))
+        response = await db.execute(select(PostImages).where(uuid.UUID(id) == PostImages.id))
         post = response.scalars().first()
 
         if not post:
@@ -141,4 +140,19 @@ async def delete_item_id(id: str, db: AsyncSession = Depends(get_async_session))
         await db.commit()
         return {"success": "post deleted"}
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(ex))
+
+
+@app.delete("/posts/delete/text/{id}")
+async def delete_textpost_id(id: str, db: AsyncSession = Depends(get_async_session)):
+    try:
+        response = await db.execute(select(Posts).where(uuid.UUID(id) == Posts.id))
+        post = response.scalars().first()
+        if not post:
+            raise HTTPException(status_code=404, detail="post not found")
+
+        await db.delete(post)
+        await db.commit()
+        return {"success": "text post deleted success fully"}
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=str(ex))

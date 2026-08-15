@@ -8,12 +8,6 @@ from sqlalchemy.orm import DeclarativeBase
 from pydantic import BaseModel
 
 
-class PostModel(BaseModel):
-    auther: str
-    title: str
-    discription: str
-
-
 class DataBaseModel(DeclarativeBase):
     pass
 
