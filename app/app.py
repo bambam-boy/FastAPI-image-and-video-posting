@@ -50,15 +50,7 @@ async def get_post_id(id: str, db: AsyncSession = Depends(get_async_session)):
             return {"post": post}
 
 
-# @app.get("/posts/get")
-# def get_post_by_limit(lenght: int = None):
-#     if lenght:
-#         return list(text_posts.values())[:lenght]
-#     else:
-#         return text_posts
-
-
-@app.post("/posts/new")
+@app.post("/posts/add/textpost")
 async def add_new_post(
     user_auther: str,
     user_title: str,
@@ -77,7 +69,7 @@ async def add_new_post(
     return post
 
 
-@app.post("/posts/upload")
+@app.post("/posts/add/imagepost")
 async def uploadimage(
         file: UploadFile = File(...),
         dis: str = Form(""),
@@ -133,3 +125,20 @@ async def get_all_images(
         })
 
     return {"posts": post_data}
+
+
+@app.delete("/posts/delete/{id}")
+async def delete_item_id(id: str, db: AsyncSession = Depends(get_async_session)):
+    try:
+        post_id = uuid.UUID(id)
+        response = await db.execute(select(PostImages).where(post_id == PostImages.id))
+        post = response.scalars().first()
+
+        if not post:
+            raise HTTPException(status_code=404, detail="pos not found")
+
+        await db.delete(post)
+        await db.commit()
+        return {"success": "post deleted"}
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=str(e))
