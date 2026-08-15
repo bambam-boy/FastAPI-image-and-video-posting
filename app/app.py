@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException, Form, File, UploadFile, Depends
-from app.models import PostModel
+from app.models import PostModel, PostImages
 from app.core.db import creat_db_and_table, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
+from sqlalchemy import select
 
 
 @asynccontextmanager
@@ -96,7 +97,7 @@ def get_post_by_limit(lenght: int = None):
         return text_posts
 
 
-@app.post("/posts/")
+@app.post("/posts/new")
 def add_new_post(post: PostModel) -> PostModel:
     index = len(text_posts.keys())+1
     text_posts[index] = {
@@ -107,10 +108,36 @@ def add_new_post(post: PostModel) -> PostModel:
     return text_posts
 
 
-@app.post("/upload")
-async def uploadfile(
+@app.post("/posts/upload")
+async def uploadimage(
         file: UploadFile = File(...),
-        caption: str = Form(""),
+        dis: str = Form(""),
         session: AsyncSession = Depends(get_async_session)
 ):
-    pass
+    post = PostImages(
+        caption=dis,
+        file_type="photo",
+        file_name="someting"
+    )
+
+    session.add(post)
+    await session.commit()
+    await session.refresh(post)
+    return post
+
+
+@app.get("/posts/get/date")
+async def get_feed(
+    session: AsyncSession = Depends(get_async_session)
+):
+    result = await session.execute(
+        select(PostImages).order_by(PostImages.Date.desc()))
+    posts = [row[0] for row in result.all()]
+    post_data = []
+    for post in posts:
+        post_data.append({
+            "id": str(post.id),
+            "caption": post.caption
+        })
+
+    return {"posts": post_data}

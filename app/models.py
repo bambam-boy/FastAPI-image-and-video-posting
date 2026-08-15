@@ -21,7 +21,7 @@ class DataBaseModel(DeclarativeBase):
 class PostImages(DataBaseModel):
     __tablename__ = "postimages"
     id = Column(UUID(as_uuid=True), primary_key=True,
-                dialect_kwargs=uuid.uuid4)
+                default=uuid.uuid4)
     caption = Column(Text)
     file_name = Column(String, nullable=False)
     file_type = Column(String, nullable=False)
