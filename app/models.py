@@ -25,6 +25,7 @@ class PostImages(DataBaseModel):
     caption = Column(Text)
     file_name = Column(String, nullable=False)
     file_type = Column(String, nullable=False)
+    url = Column(String, nullable=False)
     Date = Column(DateTime, default=datetime.utcnow())
 
 

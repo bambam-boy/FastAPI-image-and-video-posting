@@ -1,9 +1,16 @@
+import shutil
+import os
+import uuid
+import tempfile
+
+
 from fastapi import FastAPI, HTTPException, Form, File, UploadFile, Depends
 from app.models import PostModel, PostImages, Posts
 from app.core.db import creat_db_and_table, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from sqlalchemy import select
+from app.images import imagekit
 
 
 @asynccontextmanager
@@ -76,30 +83,53 @@ async def uploadimage(
         dis: str = Form(""),
         session: AsyncSession = Depends(get_async_session)
 ):
-    post = PostImages(
-        caption=dis,
-        file_type="photo",
-        file_name="someting"
-    )
 
-    session.add(post)
-    await session.commit()
-    await session.refresh(post)
-    return post
+    temp_file_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            temp_file_path = temp_file.name
+            shutil.copyfileobj(file.file, temp_file)
+
+        with open(temp_file_path, "rb") as filepath:
+            rps = imagekit.files.upload(
+                file=filepath, file_name=file.filename)
+
+        # TODO: add thumbnale url
+        post = PostImages(
+            caption=dis,
+            file_type=rps.file_type,
+            file_name=rps.name,
+            url=rps.url
+        )
+
+        session.add(post)
+        await session.commit()
+        await session.refresh(post)
+        return post
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        file.file.close()
 
 
-@app.get("/posts/get/date")
-async def get_feed(
+@app.get("/posts/get/images/all")
+async def get_all_images(
     session: AsyncSession = Depends(get_async_session)
 ):
     result = await session.execute(
-        select(PostImages).order_by(PostImages.Date.desc()))
+        select(PostImages))
     posts = [row[0] for row in result.all()]
     post_data = []
     for post in posts:
         post_data.append({
             "id": str(post.id),
-            "caption": post.caption
+            "caption": post.caption,
+            "url": post.url,
+            "filename": post.file_name,
+            "filetype": post.file_type,
+            "Date": post.Date
         })
 
     return {"posts": post_data}
