@@ -5,12 +5,12 @@ import tempfile
 
 
 from fastapi import FastAPI, HTTPException, Form, File, UploadFile, Depends
-from app.models import PostImages, Posts
-from app.core.db import creat_db_and_table, get_async_session
+from app.models.PostModels import PostImages, Posts
+from app.database.db import creat_db_and_table, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from sqlalchemy import select
-from app.images import imagekit
+from app.core.images import imagekit
 
 
 @asynccontextmanager
@@ -23,7 +23,7 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def home():
-    return {"isworking": "True"}
+    return {"fastapi": "postingProject"}
 
 
 @app.get("/posts/get/all")
@@ -48,6 +48,27 @@ async def get_post_id(id: str, db: AsyncSession = Depends(get_async_session)):
     for post in posts:
         if str(post.id) == id:
             return {"post": post}
+
+
+@app.get("/posts/get/images/all")
+async def get_all_images(
+    session: AsyncSession = Depends(get_async_session)
+):
+    result = await session.execute(
+        select(PostImages))
+    posts = [row[0] for row in result.all()]
+    post_data = []
+    for post in posts:
+        post_data.append({
+            "id": str(post.id),
+            "caption": post.caption,
+            "url": post.url,
+            "filename": post.file_name,
+            "filetype": post.file_type,
+            "Date": post.Date
+        })
+
+    return {"posts": post_data}
 
 
 @app.post("/posts/add/textpost")
@@ -104,27 +125,6 @@ async def uploadimage(
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
         file.file.close()
-
-
-@app.get("/posts/get/images/all")
-async def get_all_images(
-    session: AsyncSession = Depends(get_async_session)
-):
-    result = await session.execute(
-        select(PostImages))
-    posts = [row[0] for row in result.all()]
-    post_data = []
-    for post in posts:
-        post_data.append({
-            "id": str(post.id),
-            "caption": post.caption,
-            "url": post.url,
-            "filename": post.file_name,
-            "filetype": post.file_type,
-            "Date": post.Date
-        })
-
-    return {"posts": post_data}
 
 
 @app.delete("/posts/delete/images/{id}")

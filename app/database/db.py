@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from app.models import DataBaseModel
+from app.models.PostModels import DataBaseModel
 
 USERNAME = "postgres"
 PASSWORD = "lokihoo88"
