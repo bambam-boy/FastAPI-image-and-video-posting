@@ -3,13 +3,9 @@ from datetime import datetime
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import relationship
 
-from pydantic import BaseModel
-
-
-class DataBaseModel(DeclarativeBase):
-    pass
+from app.models.ModelBase import DataBaseModel
 
 
 class PostImages(DataBaseModel):
@@ -26,6 +22,9 @@ class PostImages(DataBaseModel):
 class Posts(DataBaseModel):
     __tablename__ = "posts"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False)
     auther = Column(String, nullable=False)
     title = Column(String, nullable=False)
     discription = Column(Text)
+    user = relationship("User", back_populates="posts")
+    # images = relationship("PostImages", back_populates="posts")

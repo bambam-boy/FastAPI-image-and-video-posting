@@ -11,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from sqlalchemy import select
 from app.core.images import imagekit
+from app.core.user import auth_backend, current_active_user, fastapi_user
+from app.models.schemas import UserCreat, UserRead, UserUpdate
+from app.models.UserModels import User
 
 
 @asynccontextmanager
@@ -20,6 +23,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+app.include_router(fastapi_user.get_auth_router(
+    auth_backend), prefix="/auth/jwt", tags=["auth"])
+app.include_router(fastapi_user.get_register_router(UserRead, UserCreat),
+                   prefix="/auth", tags=["auth"])
+app.include_router(fastapi_user.get_reset_password_router(),
+                   prefix="/auth", tags=["auth"])
+app.include_router(fastapi_user.get_verify_router(
+    UserRead), prefix="/auth", tags=["auth"])
+app.include_router(fastapi_user.get_users_router(
+    UserRead, UserUpdate), prefix="/auth", tags=["auth"])
+
 
 @app.get("/")
 def home():
@@ -27,7 +41,9 @@ def home():
 
 
 @app.get("/posts/get/all")
-async def get_post_all(db: AsyncSession = Depends(get_async_session)):
+async def get_post_all(
+    db: AsyncSession = Depends(get_async_session),
+):
     result = await db.execute(select(Posts))
     posts = [row[0] for row in result.all()]
     post_data = []
@@ -42,7 +58,7 @@ async def get_post_all(db: AsyncSession = Depends(get_async_session)):
 
 
 @app.get("/posts/get/id")
-async def get_post_id(id: str, db: AsyncSession = Depends(get_async_session)):
+async def get_post_id(id: str, db: AsyncSession = Depends(get_async_session),    user: User = Depends(current_active_user)):
     result = await db.execute(select(Posts))
     posts = [row[0] for row in result.all()]
     for post in posts:
@@ -76,12 +92,14 @@ async def add_new_post(
     user_auther: str,
     user_title: str,
     dis: str,
+    user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     post = Posts(
         auther=user_auther,
         title=user_title,
         discription=dis,
+        user_id=user.id
     )
 
     db.add(post)
@@ -92,6 +110,7 @@ async def add_new_post(
 
 @app.post("/posts/add/imagepost")
 async def uploadimage(
+        user: User = Depends(current_active_user),
         file: UploadFile = File(...),
         dis: str = Form(""),
         session: AsyncSession = Depends(get_async_session)
@@ -128,7 +147,7 @@ async def uploadimage(
 
 
 @app.delete("/posts/delete/images/{id}")
-async def delete_imagepost_id(id: str, db: AsyncSession = Depends(get_async_session)):
+async def delete_imagepost_id(id: str, user: User = Depends(current_active_user), db: AsyncSession = Depends(get_async_session)):
     try:
         response = await db.execute(select(PostImages).where(uuid.UUID(id) == PostImages.id))
         post = response.scalars().first()
@@ -144,15 +163,19 @@ async def delete_imagepost_id(id: str, db: AsyncSession = Depends(get_async_sess
 
 
 @app.delete("/posts/delete/text/{id}")
-async def delete_textpost_id(id: str, db: AsyncSession = Depends(get_async_session)):
+async def delete_textpost_id(id: str, user: User = Depends(current_active_user), db: AsyncSession = Depends(get_async_session)):
     try:
         response = await db.execute(select(Posts).where(uuid.UUID(id) == Posts.id))
         post = response.scalars().first()
-        if not post:
-            raise HTTPException(status_code=404, detail="post not found")
+        if post.user_id == user.id:
+            if not post:
+                raise HTTPException(status_code=404, detail="post not found")
 
-        await db.delete(post)
-        await db.commit()
-        return {"success": "text post deleted success fully"}
+            await db.delete(post)
+            await db.commit()
+            return {"success": "text post deleted success fully"}
+        else:
+            raise HTTPException(
+                status_code=401, detail="you dont have access to delete this post")
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))
