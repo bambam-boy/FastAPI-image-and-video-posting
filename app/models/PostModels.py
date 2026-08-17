@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
 
 from app.models.ModelBase import DataBaseModel
 

@@ -50,6 +50,15 @@ async def get_all_posts(db: AsyncSession = Depends(get_async_session)):
     return posts_data
 
 
+@app.get("/posts/get/{id}")
+async def get_post_by_id(id: str, db: AsyncSession = Depends(get_async_session)):
+    result = await db.execute(select(Posts).where(id == Posts.id))
+    post = result.scalars().first()
+    if not post:
+        raise HTTPException(status_code=404, detail="post not found")
+    return post
+
+
 @app.post("/posts/add")
 async def add_new_post(
         title: str,
@@ -61,14 +70,7 @@ async def add_new_post(
 
     temp_file_path = None
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            temp_file_path = temp_file.name
-            shutil.copyfileobj(file.file, temp_file)
-
-        with open(temp_file_path, "rb") as filepath:
-            rps = imagekit.files.upload(
-                file=filepath, file_name=file.filename)
-
+        rps = get_image_from_file(file)
         # TODO: add thumbnale url
         post = Posts(
             user_id=user.id,
@@ -113,13 +115,39 @@ async def delete_post_by_id(
 
 
 @app.post("/posts/update/{id}")
-async def update_post_by_id(id: str, title: str | None, discription: str | None, db: AsyncSession = Depends(get_async_session), user: User = Depends(current_active_user)):
+async def update_post_by_id(
+    id: str, title: str | None = "",
+    discription: str | None = "",
+    file: UploadFile = File(None),
+    db: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+):
     result = await db.execute(select(Posts).where(id == Posts.id))
     post = result.scalars().first()
-    # TODO add user auth checker befor upodate the post``
-    if not post:
-        raise HTTPException(status_code=404, detail="post not found")
-    post.title = title
-    post.discription = discription
-    await db.commit()
-    return post
+    if user.id == post.user_id:
+        if not post:
+            raise HTTPException(status_code=404, detail="post not found")
+        post.title = title
+        post.discription = discription
+        if file:
+            rps = get_image_from_file(file)
+            post.url = rps.url
+        await db.commit()
+        return post
+    else:
+        raise HTTPException(
+            status_code=403, detail="you dont have permision to delete this post")
+
+
+def get_image_from_file(file: UploadFile = File(...)):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+            temp_file_path = temp_file.name
+            shutil.copyfileobj(file.file, temp_file)
+
+        with open(temp_file_path, "rb") as filepath:
+            rps = imagekit.files.upload(
+                file=filepath, file_name=file.filename)
+        return rps
+    except Exception as e:
+        raise Exception(e)
