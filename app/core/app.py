@@ -32,7 +32,7 @@ app.include_router(fastapi_user.get_reset_password_router(),
 app.include_router(fastapi_user.get_verify_router(
     UserRead), prefix="/auth", tags=["auth"])
 app.include_router(fastapi_user.get_users_router(
-    UserRead, UserUpdate), prefix="/auth", tags=["auth"])
+    UserRead, UserUpdate), prefix="/auth", tags=["users"])
 
 
 @app.get("/")
@@ -52,7 +52,8 @@ async def get_post_all(
             "id": post.id,
             "auther": post.auther,
             "title": post.title,
-            "discription": post.discription
+            "discription": post.discription,
+            "user_id": str(post.user_id)
         })
     return {"posts": post_data}
 
@@ -89,14 +90,13 @@ async def get_all_images(
 
 @app.post("/posts/add/textpost")
 async def add_new_post(
-    user_auther: str,
     user_title: str,
     dis: str,
     user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     post = Posts(
-        auther=user_auther,
+        auther=user.username,
         title=user_title,
         discription=dis,
         user_id=user.id
@@ -176,6 +176,6 @@ async def delete_textpost_id(id: str, user: User = Depends(current_active_user),
             return {"success": "text post deleted success fully"}
         else:
             raise HTTPException(
-                status_code=401, detail="you dont have access to delete this post")
+                status_code=403, detail="you dont have access to delete this post")
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))

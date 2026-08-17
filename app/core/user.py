@@ -26,7 +26,6 @@ class UserManger(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     # async def on_after_register(self, user: User, request: Optional[Request] = None):
     #     return await super().on_after_register(user, request)
 
-
 async def get_user_manger(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
     yield UserManger(user_db)
 
