@@ -8,17 +8,6 @@ from sqlalchemy.orm import relationship
 from app.models.ModelBase import DataBaseModel
 
 
-class PostImages(DataBaseModel):
-    __tablename__ = "postimages"
-    id = Column(UUID(as_uuid=True), primary_key=True,
-                default=uuid.uuid4)
-    caption = Column(Text)
-    file_name = Column(String, nullable=False)
-    file_type = Column(String, nullable=False)
-    url = Column(String, nullable=False)
-    Date = Column(DateTime, default=datetime.utcnow())
-
-
 class Posts(DataBaseModel):
     __tablename__ = "posts"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -27,4 +16,7 @@ class Posts(DataBaseModel):
     title = Column(String, nullable=False)
     discription = Column(Text)
     user = relationship("User", back_populates="posts")
-    # images = relationship("PostImages", back_populates="posts")
+    file_name = Column(String, nullable=False)
+    file_type = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    Date = Column(DateTime, default=datetime.utcnow())
