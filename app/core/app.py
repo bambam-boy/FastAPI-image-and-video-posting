@@ -1,19 +1,16 @@
-import shutil
 import os
-import uuid
-import tempfile
 
 
-from fastapi import FastAPI, HTTPException, Form, File, UploadFile, Depends
+from fastapi import FastAPI, HTTPException, File, UploadFile, Depends
 from app.models.PostModels import Posts
 from app.database.db import creat_db_and_table, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from sqlalchemy import select
-from app.core.images import imagekit
 from app.core.user import auth_backend, current_active_user, fastapi_user
 from app.models.schemas import UserCreat, UserRead, UserUpdate
 from app.models.UserModels import User
+from app.utils.utils import get_image_from_file
 
 
 @asynccontextmanager
@@ -137,17 +134,3 @@ async def update_post_by_id(
     else:
         raise HTTPException(
             status_code=403, detail="you dont have permision to delete this post")
-
-
-def get_image_from_file(file: UploadFile = File(...)):
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            temp_file_path = temp_file.name
-            shutil.copyfileobj(file.file, temp_file)
-
-        with open(temp_file_path, "rb") as filepath:
-            rps = imagekit.files.upload(
-                file=filepath, file_name=file.filename)
-        return rps
-    except Exception as e:
-        raise Exception(e)
