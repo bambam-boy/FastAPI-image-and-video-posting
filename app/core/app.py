@@ -110,3 +110,16 @@ async def delete_post_by_id(
     else:
         raise HTTPException(
             status_code=403, detail="you dont have permision to delete this post")
+
+
+@app.post("/posts/update/{id}")
+async def update_post_by_id(id: str, title: str | None, discription: str | None, db: AsyncSession = Depends(get_async_session), user: User = Depends(current_active_user)):
+    result = await db.execute(select(Posts).where(id == Posts.id))
+    post = result.scalars().first()
+    # TODO add user auth checker befor upodate the post``
+    if not post:
+        raise HTTPException(status_code=404, detail="post not found")
+    post.title = title
+    post.discription = discription
+    await db.commit()
+    return post
