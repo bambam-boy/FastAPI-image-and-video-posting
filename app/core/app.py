@@ -1,5 +1,5 @@
 import os
-
+import json
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Depends
 from app.models.PostModels import Posts
@@ -40,11 +40,8 @@ def home():
 @app.get("/posts/get")
 async def get_all_posts(db: AsyncSession = Depends(get_async_session)):
     resoult = await db.execute(select(Posts))
-    posts = [row[0] for row in resoult.all()]
-    posts_data = []
-    for post in posts:
-        posts_data.append(post)
-    return posts_data
+    posts = resoult.scalars().all()
+    return {"posts": posts}
 
 
 @app.get("/posts/get/{id}")
