@@ -108,7 +108,7 @@ async def delete_post_by_id(
             status_code=403, detail="you dont have permision to delete this post")
 
 
-@app.post("/posts/update/{id}")
+@app.put("/posts/update/{id}")
 async def update_post_by_id(
     id: str, title: str | None = "",
     discription: str | None = "",
