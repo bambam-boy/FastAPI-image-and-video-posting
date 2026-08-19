@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.core.user import auth_backend, current_active_user, fastapi_user
 from app.models.schemas import UserCreat, UserRead, UserUpdate
 from app.models.UserModels import User
-from app.utils.utils import get_image_from_file
+from app.utils.utils import get_image_from_file, add_new_value_to_redis
 from redis.asyncio import Redis
 from fastapi.encoders import jsonable_encoder
 
@@ -35,8 +35,6 @@ app.include_router(fastapi_user.get_verify_router(
 app.include_router(fastapi_user.get_users_router(
     UserRead, UserUpdate), prefix="/auth", tags=["users"])
 
-is_anychanges = True
-
 
 @app.get("/")
 def home():
@@ -45,23 +43,17 @@ def home():
 
 @app.get("/posts/get")
 async def get_all_posts(db: AsyncSession = Depends(get_async_session)):
-    global is_anychanges
     values = await app.state.redis.get("posts")
-    if is_anychanges or values is None:
-        resoult = await db.execute(select(Posts))
-        resout_value = resoult.scalars().all()
-        converted_value = jsonable_encoder(resout_value)
-        posts = {"posts": converted_value}
-        await app.state.redis.set("posts", json.dumps(posts))
-        is_anychanges = False
-        return posts
-    else:
-        return json.loads(values)
+    if values is None:
+        values = await add_new_value_to_redis(True, "posts", app, db)
+    return json.loads(values)
 
 
 @app.get("/posts/get/{id}")
 async def get_post_by_id(id: str, db: AsyncSession = Depends(get_async_session)):
-    values = app.state.redis.get("posts")
+    values = await app.state.redis.get("posts")
+    if values is None:
+        values = await add_new_value_to_redis(True, "posts", app, db)
     value = json.loads(values)["posts"].get(id)
     if not value:
         raise HTTPException(status_code=404, detail="post not found")
@@ -98,9 +90,7 @@ async def add_new_post(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        global is_anychanges
-        if not is_anychanges:
-            is_anychanges = True
+        await app.state.redis.delete("posts")
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
         file.file.close()
@@ -128,9 +118,7 @@ async def delete_post_by_id(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        global is_anychanges
-        if not is_anychanges:
-            is_anychanges = True
+        await app.state.redis.delete("posts")
 
 
 @app.put("/posts/update/{id}")
@@ -160,6 +148,4 @@ async def update_post_by_id(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        global is_anychanges
-        if not is_anychanges:
-            is_anychanges = True
+        await app.state.redis.delete("posts")
