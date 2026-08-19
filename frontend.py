@@ -153,19 +153,15 @@ def feed_page():
             with col1:
                 st.markdown(f"**{post['auther']}** • {post['Date'][:10]}")
             with col2:
-                user_response = requests.get(
-                    "http://localhost:8000/auth/me", headers=get_headers())
-                if user_response.status_code == 200:
-                    if post["user_id"] == user_response.json()["id"]:
-                        if st.button("🗑️", key=f"delete_{post['id']}", help="Delete post"):
-                            # Delete the post
-                            response = requests.delete(
-                                f"http://localhost:8000/posts/delete/{post['id']}", headers=get_headers())
-                            if response.status_code == 200:
-                                st.success("Post deleted!")
-                                st.rerun()
-                            else:
-                                st.error("Failed to delete post!")
+                if st.button("🗑️", key=f"delete_{post['id']}", help="Delete post"):
+                    # Delete the post
+                    response = requests.delete(
+                        f"http://localhost:8000/posts/delete/{post['id']}", headers=get_headers())
+                    if response.status_code == 200:
+                        st.success("Post deleted!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to delete post!")
             # Uniform media display with caption overlay
             caption = post.get('caption', '')
             if post['file_type'] == 'image':
