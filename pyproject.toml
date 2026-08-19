@@ -9,6 +9,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
     "fastapi-users[sqlalchemy]>=15.0.5",
+    "httpx>=0.28.1",
     "imagekitio>=5.8.0",
     "python-dotenv>=1.2.2",
     "redis>=8.1.0",

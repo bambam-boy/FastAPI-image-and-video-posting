@@ -11,12 +11,16 @@ from app.core.user import auth_backend, current_active_user, fastapi_user
 from app.models.schemas import UserCreat, UserRead, UserUpdate
 from app.models.UserModels import User
 from app.utils.utils import get_image_from_file
+from redis.asyncio import Redis
+from fastapi.encoders import jsonable_encoder
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await creat_db_and_table()
+    app.state.redis = Redis(host="localhost", port=6379, protocol=2)
     yield
+    await app.state.redis.close()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -31,6 +35,8 @@ app.include_router(fastapi_user.get_verify_router(
 app.include_router(fastapi_user.get_users_router(
     UserRead, UserUpdate), prefix="/auth", tags=["users"])
 
+is_anychanges = True
+
 
 @app.get("/")
 def home():
@@ -39,18 +45,27 @@ def home():
 
 @app.get("/posts/get")
 async def get_all_posts(db: AsyncSession = Depends(get_async_session)):
-    resoult = await db.execute(select(Posts))
-    posts = resoult.scalars().all()
-    return {"posts": posts}
+    global is_anychanges
+    values = await app.state.redis.get("posts")
+    if is_anychanges or values is None:
+        resoult = await db.execute(select(Posts))
+        resout_value = resoult.scalars().all()
+        converted_value = jsonable_encoder(resout_value)
+        posts = {"posts": converted_value}
+        await app.state.redis.set("posts", json.dumps(posts))
+        is_anychanges = False
+        return posts
+    else:
+        return json.loads(values)
 
 
 @app.get("/posts/get/{id}")
 async def get_post_by_id(id: str, db: AsyncSession = Depends(get_async_session)):
-    result = await db.execute(select(Posts).where(id == Posts.id))
-    post = result.scalars().first()
-    if not post:
+    values = app.state.redis.get("posts")
+    value = json.loads(values)["posts"].get(id)
+    if not value:
         raise HTTPException(status_code=404, detail="post not found")
-    return post
+    return value
 
 
 @app.post("/posts/add")
@@ -83,6 +98,9 @@ async def add_new_post(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        global is_anychanges
+        if not is_anychanges:
+            is_anychanges = True
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
         file.file.close()
@@ -94,18 +112,25 @@ async def delete_post_by_id(
     db: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user)
 ):
-    result = await db.execute(select(Posts).where(id == Posts.id))
-    post = result.scalars().first()
+    try:
+        result = await db.execute(select(Posts).where(id == Posts.id))
+        post = result.scalars().first()
 
-    if post.user_id == user.id:
-        if not post:
-            raise HTTPException(status_code=404, detail="post not found")
-        await db.delete(post)
-        await db.commit()
-        return {"success": "true"}
-    else:
-        raise HTTPException(
-            status_code=403, detail="you dont have permision to delete this post")
+        if post.user_id == user.id:
+            if not post:
+                raise HTTPException(status_code=404, detail="post not found")
+            await db.delete(post)
+            await db.commit()
+            return {"success": "true"}
+        else:
+            raise HTTPException(
+                status_code=403, detail="you dont have permision to delete this post")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        global is_anychanges
+        if not is_anychanges:
+            is_anychanges = True
 
 
 @app.put("/posts/update/{id}")
@@ -116,18 +141,25 @@ async def update_post_by_id(
     db: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ):
-    result = await db.execute(select(Posts).where(id == Posts.id))
-    post = result.scalars().first()
-    if user.id == post.user_id:
-        if not post:
-            raise HTTPException(status_code=404, detail="post not found")
-        post.title = title
-        post.discription = discription
-        if file:
-            rps = get_image_from_file(file)
-            post.url = rps.url
-        await db.commit()
-        return post
-    else:
-        raise HTTPException(
-            status_code=403, detail="you dont have permision to delete this post")
+    try:
+        result = await db.execute(select(Posts).where(id == Posts.id))
+        post = result.scalars().first()
+        if user.id == post.user_id:
+            if not post:
+                raise HTTPException(status_code=404, detail="post not found")
+            post.title = title
+            post.discription = discription
+            if file:
+                rps = get_image_from_file(file)
+                post.url = rps.url
+            await db.commit()
+            return post
+        else:
+            raise HTTPException(
+                status_code=403, detail="you dont have permision to delete this post")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        global is_anychanges
+        if not is_anychanges:
+            is_anychanges = True
