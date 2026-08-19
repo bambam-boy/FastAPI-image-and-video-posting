@@ -12,7 +12,6 @@ from app.models.schemas import UserCreat, UserRead, UserUpdate
 from app.models.UserModels import User
 from app.utils.utils import get_image_from_file, add_new_value_to_redis
 from redis.asyncio import Redis
-from fastapi.encoders import jsonable_encoder
 
 
 @asynccontextmanager
@@ -72,7 +71,6 @@ async def add_new_post(
     temp_file_path = None
     try:
         rps = get_image_from_file(file)
-        # TODO: add thumbnale url
         post = Posts(
             user_id=user.id,
             auther=user.username,
